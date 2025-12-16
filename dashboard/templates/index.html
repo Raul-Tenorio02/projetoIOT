@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌱 IoT Agro Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌱 Monitoramento Agrícola em Tempo Real</h1>
+        
+        <div class="card">
+            <h3>Produtividade Estimada (IA)</h3>
+            <h2 id="predicao" style="color: green;">Carregando...</h2>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <canvas id="chartUmidade"></canvas>
+            </div>
+            <div class="card">
+                <canvas id="chartNutrientes"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchData() {
+            const response = await fetch('/api/solo');
+            const data = await response.json();
+            
+            // Arrays para o gráfico
+            const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
+            const umidade = data.map(d => d.umidade);
+            const n = data.map(d => d.n);
+            const p = data.map(d => d.p);
+            const k = data.map(d => d.k);
+
+            updateChart(chartUmidade, labels, [{ label: 'Umidade do Solo (%)', data: umidade, borderColor: 'blue' }]);
+            updateChart(chartNutrientes, labels, [
+                { label: 'N', data: n, borderColor: 'red' },
+                { label: 'P', data: p, borderColor: 'green' },
+                { label: 'K', data: k, borderColor: 'orange' }
+            ]);
+        }
+
+       async function fetchAI() {
+            try {
+                const res = await fetch('/api/predicao');
+                const data = await res.json();
+                
+                // SE OCORREU ERRO NA API (Backend devolveu chave 'erro')
+                if (data.erro) {
+                    console.error("Erro na API:", data.erro);
+                    document.getElementById('predicao').innerText = `Erro: ${data.erro}`;
+                    document.getElementById('predicao').style.color = 'red';
+                    return;
+                }
+
+                // SE O STATUS NÃO FOR 200 (Erro de servidor)
+                if (!res.ok) {
+                    document.getElementById('predicao').innerText = "Erro interno do servidor";
+                    return;
+                }
+
+                // SUCESSO
+                if (data.produtividade_estimada_kg !== undefined) {
+                    document.getElementById('predicao').innerText = `${data.produtividade_estimada_kg} kg/ha`;
+                    document.getElementById('predicao').style.color = 'green';
+                } else {
+                    document.getElementById('predicao').innerText = "Dados incompletos";
+                }
+                
+            } catch (e) {
+                console.error("Falha no fetch:", e);
+                document.getElementById('predicao').innerText = "Falha na conexão";
+            }
+        }
+
+        let chartUmidade = new Chart(document.getElementById('chartUmidade'), {
+            type: 'line', data: { labels: [], datasets: [] }
+        });
+
+        let chartNutrientes = new Chart(document.getElementById('chartNutrientes'), {
+            type: 'line', data: { labels: [], datasets: [] }
+        });
+
+        function updateChart(chart, labels, datasets) {
+            chart.data.labels = labels;
+            chart.data.datasets = datasets.map(d => ({...d, fill: false, tension: 0.1}));
+            chart.update();
+        }
+
+        // Atualiza a cada 2 segundos
+        setInterval(fetchData, 2000);
+        fetchData();
+        fetchAI();
+    </script>
+</body>
+</html>

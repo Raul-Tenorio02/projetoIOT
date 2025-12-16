@@ -1,8 +1,6 @@
 flask
-mysql-connector-python
+flask-sqlalchemy
+flask-cors
 pandas
-numpy
 scikit-learn
-matplotlib
-seaborn
 requests
